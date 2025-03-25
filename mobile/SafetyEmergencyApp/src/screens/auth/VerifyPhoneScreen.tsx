@@ -1,23 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, TextInput, Button } from 'react-native-paper';
+import { View, StyleSheet, Alert } from 'react-native';
+import { Text, TextInput, Button, HelperText } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { authAPI } from '../../services/api';
+import { authService } from '../../services/auth';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 type RootStackParamList = {
   Login: undefined;
-  VerifyPhone: { phone: string };
+  VerifyPhone: { phone: string; userId: string };
   MainApp: undefined;
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VerifyPhone'>;
 
 const VerifyPhoneScreen = ({ route, navigation }: Props) => {
-  const { phone } = route.params;
+  const { phone, userId } = route.params;
   const [code, setCode] = useState('');
   const [timer, setTimer] = useState(60);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -27,22 +28,42 @@ const VerifyPhoneScreen = ({ route, navigation }: Props) => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleVerify = async () => {
-    if (code.length !== 6) {
-      alert('Please enter a valid verification code');
-      return;
+  const validateCode = () => {
+    setError('');
+    if (!code) {
+      setError('Please enter the verification code');
+      return false;
     }
+    if (code.length !== 6) {
+      setError('Verification code must be 6 digits');
+      return false;
+    }
+    if (!/^\d+$/.test(code)) {
+      setError('Verification code must contain only numbers');
+      return false;
+    }
+    return true;
+  };
+
+  const handleVerify = async () => {
+    if (!validateCode()) return;
 
     setLoading(true);
     try {
-      await authAPI.verifyPhone(phone, code);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'MainApp' }],
-      });
-    } catch (error) {
-      console.error(error);
-      alert('Verification failed. Please try again.');
+      const verified = await authService.verifyPhone(phone, code);
+      if (verified) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainApp' }],
+        });
+      } else {
+        setError('Invalid verification code');
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Verification Failed',
+        error.message || 'Failed to verify phone number'
+      );
     } finally {
       setLoading(false);
     }
@@ -52,20 +73,34 @@ const VerifyPhoneScreen = ({ route, navigation }: Props) => {
     if (timer > 0) return;
 
     try {
-      // TODO: Implement resend code logic
+      // Implement resend code logic here
       setTimer(60);
-    } catch (error) {
-      console.error(error);
-      alert('Failed to resend code. Please try again.');
+      Alert.alert(
+        'Code Sent',
+        'A new verification code has been sent to your phone number'
+      );
+    } catch (error: any) {
+      Alert.alert(
+        'Failed to Resend',
+        error.message || 'Failed to resend verification code'
+      );
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>Verify Phone</Text>
-          <Text style={styles.subtitle}>
+          <Text variant="headlineMedium" style={styles.title}>
+            Verify Phone
+          </Text>
+          <Text variant="bodyLarge" style={styles.subtitle}>
             Enter the verification code sent to {phone}
           </Text>
         </View>
@@ -74,32 +109,47 @@ const VerifyPhoneScreen = ({ route, navigation }: Props) => {
           <TextInput
             label="Verification Code"
             value={code}
-            onChangeText={setCode}
+            onChangeText={(text) => {
+              setCode(text);
+              setError('');
+            }}
             mode="outlined"
             keyboardType="number-pad"
             maxLength={6}
+            error={!!error}
             style={styles.input}
           />
+          <HelperText type="error" visible={!!error}>
+            {error}
+          </HelperText>
 
           <Button
             mode="contained"
             onPress={handleVerify}
             loading={loading}
-            disabled={loading || code.length !== 6}
+            disabled={loading || !code}
             style={styles.button}
           >
             Verify
           </Button>
 
           <Button
-            mode="text"
+            mode="outlined"
             onPress={handleResendCode}
             disabled={timer > 0}
             style={styles.button}
           >
             {timer > 0
-              ? `Resend code in ${timer}s`
-              : 'Resend code'}
+              ? `Resend code in ${formatTime(timer)}`
+              : 'Resend verification code'}
+          </Button>
+
+          <Button
+            mode="text"
+            onPress={() => navigation.navigate('Login')}
+            style={styles.button}
+          >
+            Back to Login
           </Button>
         </View>
       </View>
@@ -113,6 +163,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   content: {
+    flex: 1,
     padding: 16,
   },
   header: {
@@ -120,23 +171,24 @@ const styles = StyleSheet.create({
     marginVertical: 32,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
     marginBottom: 8,
+    color: '#1e88e5',
   },
   subtitle: {
-    fontSize: 16,
     color: '#666',
     textAlign: 'center',
+    marginHorizontal: 32,
   },
   form: {
-    gap: 16,
+    marginTop: 16,
   },
   input: {
-    backgroundColor: '#fff',
+    marginBottom: 4,
+    letterSpacing: 8,
+    fontSize: 20,
   },
   button: {
-    marginTop: 8,
+    marginTop: 16,
   },
 });
 

@@ -41,6 +41,14 @@ api.interceptors.response.use(
   }
 );
 
+interface RegisterData {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+}
+
 export const authAPI = {
   login: async (email: string, password: string) => {
     try {
@@ -53,12 +61,7 @@ export const authAPI = {
     }
   },
 
-  register: async (userData: {
-    email: string;
-    password: string;
-    name: string;
-    phone: string;
-  }) => {
+  register: async (userData: RegisterData) => {
     try {
       const response = await api.post('/auth/register', userData);
       return response.data;
@@ -74,6 +77,49 @@ export const authAPI = {
       return response.data;
     } catch (error) {
       console.error('Error verifying phone:', error);
+      throw error;
+    }
+  },
+
+  requestPasswordReset: async (email: string) => {
+    try {
+      const response = await api.post('/auth/request-reset', { email });
+      return response.data;
+    } catch (error) {
+      console.error('Error requesting password reset:', error);
+      throw error;
+    }
+  },
+
+  verifyResetCode: async (email: string, code: string) => {
+    try {
+      const response = await api.post('/auth/verify-reset-code', { email, code });
+      return response.data;
+    } catch (error) {
+      console.error('Error verifying reset code:', error);
+      throw error;
+    }
+  },
+
+  resetPassword: async (resetToken: string, newPassword: string) => {
+    try {
+      const response = await api.post('/auth/reset-password', {
+        token: resetToken,
+        password: newPassword,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      throw error;
+    }
+  },
+
+  deleteAccount: async (password: string) => {
+    try {
+      const response = await api.post('/auth/delete-account', { password });
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting account:', error);
       throw error;
     }
   },
