@@ -1,8 +1,8 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const { initializeDatabase } = require('./config/db');
 const authController = require('./controllers/authController');
-const jwt = require('jsonwebtoken');
 
 const app = express();
 
@@ -36,7 +36,7 @@ app.put('/api/auth/profile', authenticateToken, authController.updateProfile);
 
 // Health check route
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+    res.json({ status: 'ok' });
 });
 
 // Initialize database and start server
