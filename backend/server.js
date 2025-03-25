@@ -4,6 +4,8 @@ const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
 const mysql = require('mysql2');
+const cronService = require('./services/cronService');
+const dbMonitor = require('./services/dbMonitorService');
 
 const app = express();
 const server = http.createServer(app);
@@ -159,7 +161,60 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/services', require('./routes/services'));
 
+// Database monitoring endpoints
+app.get('/api/admin/db/metrics', async (req, res) => {
+    try {
+        const metrics = dbMonitor.getMetrics();
+        res.json(metrics);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/admin/db/backup', async (req, res) => {
+    try {
+        const backup = await dbMonitor.backup();
+        res.json(backup);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/admin/db/restore', async (req, res) => {
+    try {
+        const result = await dbMonitor.restore(req.body.backupFile);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/admin/db/optimize', async (req, res) => {
+    try {
+        const result = await dbMonitor.optimize();
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/admin/db/table-sizes', async (req, res) => {
+    try {
+        const sizes = await dbMonitor.getTableSizes();
+        res.json(sizes);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, async () => {
+    console.log(`Server running on port ${PORT}`);
+    try {
+        // Start database monitoring
+        await cronService.startMonitoring();
+        console.log('Database monitoring started');
+    } catch (error) {
+        console.error('Failed to start database monitoring:', error);
+    }
 });
