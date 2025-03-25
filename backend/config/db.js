@@ -1,6 +1,4 @@
 const mysql = require('mysql2/promise');
-const fs = require('fs');
-const path = require('path');
 
 // Database configuration
 const dbConfig = {
@@ -19,36 +17,51 @@ const pool = mysql.createPool(dbConfig);
 // Function to initialize database
 async function initializeDatabase() {
   try {
-    // Create database if it doesn't exist
-    const connection = await mysql.createConnection({
-      host: dbConfig.host,
-      user: dbConfig.user,
-      password: dbConfig.password,
-    });
+    const connection = await pool.getConnection();
+    
+    // Create users table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        phone VARCHAR(20),
+        address TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
 
-    await connection.query(`CREATE DATABASE IF NOT EXISTS ${dbConfig.database}`);
-    await connection.end();
+    // Create emergency_contacts table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS emergency_contacts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(20) NOT NULL,
+        relationship VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
 
-    // Read and execute migration files
-    const migrationsDir = path.join(__dirname, '../migrations');
-    const migrationFiles = fs.readdirSync(migrationsDir)
-      .filter(file => file.endsWith('.sql'))
-      .sort();
+    // Create emergency_alerts table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS emergency_alerts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        latitude DECIMAL(10, 8) NOT NULL,
+        longitude DECIMAL(11, 8) NOT NULL,
+        status ENUM('active', 'resolved', 'false_alarm') DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        resolved_at TIMESTAMP NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
 
-    for (const file of migrationFiles) {
-      const filePath = path.join(migrationsDir, file);
-      const migration = fs.readFileSync(filePath, 'utf8');
-      const statements = migration.split(';').filter(statement => statement.trim());
-
-      for (const statement of statements) {
-        if (statement.trim()) {
-          await pool.query(statement);
-        }
-      }
-      console.log(`Executed migration: ${file}`);
-    }
-
-    console.log('Database initialization completed successfully');
+    connection.release();
+    console.log('Database tables created successfully');
   } catch (error) {
     console.error('Error initializing database:', error);
     throw error;
