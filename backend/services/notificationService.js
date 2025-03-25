@@ -1,5 +1,5 @@
 const admin = require('firebase-admin');
-const db = require('../config/database');
+const db = require('../config/db');
 const mlService = require('./mlService');
 const analyticsService = require('./analyticsService');
 
